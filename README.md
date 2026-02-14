@@ -65,19 +65,26 @@ Each agent is a standalone process with:
 ```
 gradatim/
 ├── __init__.py          # Package metadata, version
-├── __main__.py          # Demo entry point (python -m gradatim)
+├── __main__.py          # CLI entry point (demo + web modes)
 ├── crypto.py            # ECDSA on secp256k1 (from scratch)
 ├── protocol.py          # Binary wire protocol and message types
 ├── transport.py         # UDP network layer
 ├── reputation.py        # PoW, rate limiting, reputation scoring
 ├── factorization.py     # Trial division, Pollard's Rho, Miller-Rabin
-└── agent.py             # Agent class — orchestrates everything
+├── agent.py             # Agent class — orchestrates everything
+└── web/
+    ├── __init__.py
+    ├── server.py        # HTTP server, API routes, HTML page renderers
+    ├── store.py         # In-memory store (jobs, users, invites, configs)
+    └── static/
+        └── style.css    # Craigslist-inspired minimal stylesheet
 tests/
 ├── test_crypto.py       # Point arithmetic, key gen, sign/verify
 ├── test_protocol.py     # Serialization, payload round-trips
 ├── test_factorization.py# Algorithm correctness
 ├── test_reputation.py   # PoW, rate limiter, reputation tracker
-└── test_agent.py        # Peer discovery, multi-agent factorization
+├── test_agent.py        # Peer discovery, multi-agent factorization
+└── test_web.py          # Store, server, pages, join flow
 ```
 
 ## Modules
@@ -209,10 +216,38 @@ node1.stop()
 node2.stop()
 ```
 
+### Web UI
+
+Start the Craigslist-style jobs board with a live agent backend:
+
+```bash
+python -m gradatim web
+python -m gradatim web --port 8080 --host 0.0.0.0
+```
+
+On startup the server prints invite codes for test users:
+
+```
+Gradatim web server running at http://127.0.0.1:8080
+  Invite codes (for first-time join):
+    a3Fk9x2Qw
+    ...
+```
+
+Share a code with someone. They visit `/join`, enter the code + a handle, and
+they're in. From there they can:
+
+- **Browse the board** — open problems listed like classified ads
+- **Post a problem** — enter any integer N to factor
+- **Claim & solve** — one click kicks off distributed factorization
+- **Configure compute** — local Python, OpenAI, Anthropic, Ollama, or a custom endpoint
+- **Generate invites** — bring more people into the network
+- **View network status** — connected peers, agent info, solve stats
+
 ### Running Tests
 
 ```bash
-# All tests (64 total)
+# All tests (87 total)
 python -m unittest discover -s tests -v
 
 # Individual modules
@@ -221,6 +256,7 @@ python -m unittest tests.test_protocol -v
 python -m unittest tests.test_factorization -v
 python -m unittest tests.test_reputation -v
 python -m unittest tests.test_agent -v
+python -m unittest tests.test_web -v
 ```
 
 ## How Factorization Works End-to-End

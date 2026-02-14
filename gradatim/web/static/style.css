@@ -1,0 +1,515 @@
+/*
+ * Gradatim — Craigslist-inspired minimal stylesheet
+ *
+ * Design principles: text-heavy, functional, no-frills,
+ * serif fonts, purple visited links, compact layout.
+ */
+
+/* --- Reset & Base --- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Times New Roman", Times, Georgia, serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #222;
+  background: #f6f4ef;
+}
+
+a {
+  color: #00c;
+  text-decoration: none;
+}
+a:visited {
+  color: #551a8b;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+code, .invite-code {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 14px;
+  background: #eee;
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #ccc;
+  margin: 10px 0;
+}
+
+/* --- Layout --- */
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 10px 20px;
+  background: #fff;
+  min-height: 100vh;
+  border-left: 1px solid #ddd;
+  border-right: 1px solid #ddd;
+}
+
+/* --- Header --- */
+header {
+  padding: 8px 0;
+}
+
+.site-title {
+  font-size: 22px;
+  font-weight: normal;
+  margin-bottom: 0;
+}
+
+.site-title a {
+  color: #800080;
+  text-decoration: none;
+  letter-spacing: 1px;
+}
+.site-title a:visited {
+  color: #800080;
+}
+
+.tagline {
+  font-size: 12px;
+  color: #888;
+  margin: 0 0 4px 0;
+}
+
+/* --- Navigation --- */
+.topnav {
+  font-size: 13px;
+  padding: 4px 0;
+  color: #555;
+}
+
+.topnav a {
+  margin: 0 2px;
+}
+
+.nav-user {
+  color: #333;
+  font-weight: bold;
+}
+
+/* --- Board / Homepage --- */
+.board-header h2 {
+  font-size: 18px;
+  font-weight: normal;
+  margin-bottom: 6px;
+  color: #444;
+  text-transform: lowercase;
+}
+
+.categories {
+  font-size: 13px;
+  margin-bottom: 4px;
+  color: #555;
+}
+
+.categories b {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #777;
+}
+
+.stats-bar {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 10px;
+  padding: 4px 0;
+  border-bottom: 1px dotted #ddd;
+}
+
+/* --- Jobs Table --- */
+.jobs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.jobs-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #999;
+  font-weight: normal;
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid #ddd;
+  letter-spacing: 0.5px;
+}
+
+.jobs-table td {
+  padding: 5px 8px 5px 0;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: top;
+}
+
+.jobs-table tr:hover {
+  background: #fafaf5;
+}
+
+.job-date {
+  font-size: 12px;
+  color: #999;
+  white-space: nowrap;
+  width: 110px;
+}
+
+.job-status {
+  width: 70px;
+}
+
+.job-title a {
+  font-weight: bold;
+}
+
+.job-meta {
+  font-size: 12px;
+  color: #999;
+  margin-left: 6px;
+}
+
+.job-cat {
+  font-size: 12px;
+  color: #777;
+}
+
+.job-poster {
+  font-size: 12px;
+  color: #555;
+}
+
+.job-workers {
+  font-size: 12px;
+  color: #999;
+  white-space: nowrap;
+}
+
+/* --- Status Badges --- */
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 1px 6px;
+  border-radius: 2px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: bold;
+}
+
+.badge-open {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+
+.badge-claimed {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffcc80;
+}
+
+.badge-running {
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #90caf9;
+}
+
+.badge-solved {
+  background: #f3e5f5;
+  color: #6a1b9a;
+  border: 1px solid #ce93d8;
+}
+
+.badge-failed {
+  background: #fce4ec;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+}
+
+/* --- Job Detail --- */
+.job-detail {
+  padding: 10px 0;
+}
+
+.job-detail h2 {
+  font-size: 20px;
+  font-weight: normal;
+  margin-bottom: 6px;
+}
+
+.job-detail-meta {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.job-detail-params {
+  background: #fafafa;
+  border: 1px solid #eee;
+  padding: 8px 12px;
+  margin: 10px 0;
+  font-size: 16px;
+}
+
+.job-detail-params code {
+  font-size: 16px;
+  background: none;
+  font-weight: bold;
+}
+
+.job-detail-desc {
+  margin: 10px 0;
+  color: #444;
+}
+
+.result-box {
+  background: #f5f0fa;
+  border: 1px solid #d1c4e9;
+  padding: 12px 16px;
+  margin: 14px 0;
+}
+
+.result-box h3 {
+  font-size: 14px;
+  text-transform: uppercase;
+  color: #6a1b9a;
+  margin-bottom: 4px;
+  font-family: Arial, Helvetica, sans-serif;
+  letter-spacing: 0.5px;
+}
+
+.result-factors {
+  font-size: 22px;
+  font-weight: bold;
+  color: #333;
+  margin: 6px 0;
+}
+
+.result-error {
+  background: #fce4ec;
+  border-color: #ef9a9a;
+}
+
+.result-error h3 {
+  color: #c62828;
+}
+
+.running-msg {
+  color: #1565c0;
+  font-style: italic;
+}
+
+.claim-form {
+  margin: 12px 0;
+}
+
+/* --- Forms --- */
+form label {
+  display: block;
+  font-size: 13px;
+  font-weight: bold;
+  color: #555;
+  margin: 10px 0 3px 0;
+  text-transform: lowercase;
+}
+
+form input[type="text"],
+form input[type="password"],
+form input[type="number"],
+form select,
+form textarea {
+  display: block;
+  width: 100%;
+  max-width: 450px;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 14px;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  background: #fefefe;
+  margin-bottom: 4px;
+}
+
+form textarea {
+  font-family: "Times New Roman", Times, serif;
+  resize: vertical;
+}
+
+form select {
+  max-width: 300px;
+}
+
+.btn {
+  display: inline-block;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 7px 18px;
+  margin-top: 10px;
+  background: #800080;
+  color: #fff;
+  border: 1px solid #600060;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: #9c27b0;
+}
+
+.form-error {
+  color: #c62828;
+  font-weight: bold;
+  font-size: 14px;
+  margin: 6px 0;
+}
+
+.form-success {
+  color: #2e7d32;
+  font-weight: bold;
+  font-size: 14px;
+  margin: 6px 0;
+}
+
+fieldset {
+  border: 1px solid #ddd;
+  padding: 10px 16px 14px;
+  margin: 10px 0;
+}
+
+fieldset legend {
+  font-size: 14px;
+  font-weight: bold;
+  color: #555;
+  padding: 0 6px;
+}
+
+.backend-fields {
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 2px solid #e0e0e0;
+}
+
+/* --- Invites Table --- */
+.invites-table {
+  width: 100%;
+  max-width: 600px;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin: 10px 0;
+}
+
+.invites-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #999;
+  padding: 4px 12px 4px 0;
+  border-bottom: 1px solid #ddd;
+}
+
+.invites-table td {
+  padding: 5px 12px 5px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.invite-gen-form {
+  margin: 10px 0;
+}
+
+/* --- Status Page --- */
+.status-grid {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+
+.stat-card {
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 120px;
+}
+
+.stat-number {
+  font-size: 28px;
+  font-weight: bold;
+  color: #800080;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.peers-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 10px 0;
+}
+
+.peers-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #999;
+  padding: 4px 10px 4px 0;
+  border-bottom: 1px solid #ddd;
+}
+
+.peers-table td {
+  padding: 4px 10px 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* --- Footer --- */
+footer {
+  padding: 10px 0;
+}
+
+.footer-text {
+  font-size: 11px;
+  color: #aaa;
+  text-align: center;
+}
+
+/* --- Misc --- */
+.empty {
+  color: #999;
+  padding: 20px 0;
+  text-align: center;
+}
+
+h2 {
+  font-weight: normal;
+}
+
+h3 {
+  font-size: 15px;
+  font-weight: bold;
+  margin: 14px 0 6px 0;
+  color: #444;
+}
+
+ul {
+  margin: 6px 0 6px 20px;
+}
+
+li {
+  margin: 2px 0;
+  font-size: 14px;
+}
