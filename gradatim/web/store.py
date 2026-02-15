@@ -64,6 +64,48 @@ class Store:
             params={"n": 1001},
         )
 
+        # Goldbach conjecture
+        self.create_job(
+            posted_by=sys_id,
+            title="Goldbach: decompose 1000000",
+            category="goldbach",
+            description="Express 1,000,000 as the sum of two primes. "
+                        "The Goldbach conjecture (1742) remains unproven.",
+            params={"n": 1000000},
+        )
+
+        # Collatz conjecture
+        self.create_job(
+            posted_by=sys_id,
+            title="Collatz: sequence from 27",
+            category="collatz",
+            description="Compute the Collatz sequence starting at 27. "
+                        "The 3n+1 conjecture (1937) is one of the most famous "
+                        "unsolved problems: does every sequence reach 1?",
+            params={"start": 27},
+        )
+
+        # Perfect numbers
+        self.create_job(
+            posted_by=sys_id,
+            title="Perfect numbers in [1, 100000000]",
+            category="perfect_numbers",
+            description="Search for perfect numbers up to 100 million. "
+                        "Only 51 are known. Whether odd perfect numbers "
+                        "exist is open for 2000+ years.",
+            params={"range_start": 1, "range_end": 100000000},
+        )
+
+        # Primality
+        self.create_job(
+            posted_by=sys_id,
+            title="Is 2^127 - 1 prime?",
+            category="primality",
+            description="Test if the Mersenne number 2^127 - 1 is prime. "
+                        "This was the largest known prime for 75 years.",
+            params={"n": (2**127) - 1},
+        )
+
         # Create a batch of invite codes
         for _ in range(5):
             self.create_invite(created_by=sys_id)

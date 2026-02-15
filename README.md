@@ -71,10 +71,11 @@ gradatim/
 ├── transport.py         # UDP network layer
 ├── reputation.py        # PoW, rate limiting, reputation scoring
 ├── factorization.py     # Trial division, Pollard's Rho, Miller-Rabin
+├── _solver.py           # Goldbach, Collatz, perfect numbers, primality
 ├── agent.py             # Agent class — orchestrates everything
 └── web/
     ├── __init__.py
-    ├── server.py        # HTTP server, API routes, HTML page renderers
+    ├── server.py        # Threaded HTTP server, API routes, HTML renderers
     ├── store.py         # In-memory store (jobs, users, invites, configs)
     └── static/
         └── style.css    # Craigslist-inspired minimal stylesheet
@@ -84,7 +85,14 @@ tests/
 ├── test_factorization.py# Algorithm correctness
 ├── test_reputation.py   # PoW, rate limiter, reputation tracker
 ├── test_agent.py        # Peer discovery, multi-agent factorization
-└── test_web.py          # Store, server, pages, join flow
+├── test_web.py          # Store, server, pages, join flow
+└── test_solver.py       # Goldbach, Collatz, perfect numbers, primality
+deploy/
+├── setup.sh             # One-command Linux server setup (systemd)
+├── aws.md               # AWS deployment guide
+└── digitalocean.md      # DigitalOcean deployment guide
+Dockerfile               # Production container image
+docker-compose.yml       # One-command Docker deployment
 ```
 
 ## Modules
@@ -247,7 +255,7 @@ they're in. From there they can:
 ### Running Tests
 
 ```bash
-# All tests (87 total)
+# All tests (106 total)
 python -m unittest discover -s tests -v
 
 # Individual modules
@@ -257,6 +265,7 @@ python -m unittest tests.test_factorization -v
 python -m unittest tests.test_reputation -v
 python -m unittest tests.test_agent -v
 python -m unittest tests.test_web -v
+python -m unittest tests.test_solver -v
 ```
 
 ## How Factorization Works End-to-End
@@ -297,6 +306,52 @@ Agent 1 (initiator)                    Agent 2            Agent 3
 - **DoS mitigation**: Per-peer rate limiting (100 msg/min sliding window).
 - **Byzantine tolerance**: Redundant subtask assignment with majority vote. Invalid results trigger -50 reputation penalty; peers below 0 are blacklisted and all future messages are dropped.
 - **Result verification**: Every claimed factor is checked (`n % factor == 0`) before acceptance.
+
+## Problem Types
+
+Beyond the MVP factorization, the board supports problems tied to famous open questions in mathematics:
+
+| Category | Problem | Status in Mathematics |
+|----------|---------|----------------------|
+| **Factorization** | Decompose N into prime factors | Core of RSA security; no known poly-time classical algorithm |
+| **Goldbach Conjecture** | Express even N as sum of two primes | **Unproven since 1742**; verified up to 4 x 10^18 |
+| **Collatz Conjecture** | Does the 3n+1 sequence always reach 1? | **Unproven since 1937**; verified up to ~10^20 |
+| **Perfect Numbers** | Find numbers equal to the sum of their divisors | Only 51 known; **odd perfect numbers: open 2000+ years** |
+| **Primality Testing** | Determine if N is prime | Solvable but computationally expensive for large N; distributed witnesses increase confidence |
+
+Each problem type has its own solver in `gradatim/_solver.py` and can be posted, claimed, and solved through the web UI.
+
+## Deployment
+
+### Docker (Recommended)
+
+```bash
+docker compose up -d
+# → runs at http://localhost:8080
+```
+
+### Bare metal (any Linux server)
+
+```bash
+./deploy/setup.sh
+# → installs systemd service, starts automatically
+```
+
+### Cloud platforms
+
+Detailed step-by-step guides:
+
+- **[DigitalOcean](deploy/digitalocean.md)** — $6/mo droplet, Docker or bare metal
+- **[AWS](deploy/aws.md)** — EC2, App Runner, or ECS with ALB + HTTPS
+
+### Health check
+
+All deployments can use the `/healthz` endpoint for load balancer probes:
+
+```bash
+curl http://localhost:8080/healthz
+# → {"status": "ok", "timestamp": 1739...}
+```
 
 ## Requirements
 
