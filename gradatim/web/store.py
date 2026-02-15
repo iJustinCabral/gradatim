@@ -1,7 +1,8 @@
 """
 In-memory data store for the web frontend.
 
-Manages jobs (problems), users, invite codes, and compute configurations.
+Manages jobs (problems), users, invite codes, reputation, bounties,
+and compute configurations.
 All state is held in memory — restarts clear everything.
 """
 
@@ -10,6 +11,55 @@ import secrets
 import time
 import threading
 import uuid
+
+
+# ---------------------------------------------------------------------------
+# Trust tiers — progressive access based on reputation
+# ---------------------------------------------------------------------------
+TIER_NEWCOMER = "newcomer"       # 0-49   — can view board, claim simple jobs
+TIER_CONTRIBUTOR = "contributor"  # 50-199 — can post jobs, claim any job
+TIER_TRUSTED = "trusted"         # 200-499 — can generate invites, vote on results
+TIER_EXPERT = "expert"           # 500+   — can moderate, set bounties
+
+TIER_THRESHOLDS = [
+    (500, TIER_EXPERT),
+    (200, TIER_TRUSTED),
+    (50, TIER_CONTRIBUTOR),
+    (0, TIER_NEWCOMER),
+]
+
+# Reputation rewards
+REP_JOB_SOLVED = 25       # Solver gets this for completing a job
+REP_CONTRIBUTION = 10     # Reward for valid partial work / result
+REP_POST_JOB = 2          # Small reward for posting a job
+REP_INVITE_BONUS = 5      # Bonus when your invitee first solves a job
+REP_INVALID_RESULT = -50  # Penalty for submitting bad results
+REP_INITIAL = 10          # Starting reputation for open registration
+REP_INVITED = 50          # Starting reputation for invite-redeemed users
+
+# Claim rate limiting
+MAX_ACTIVE_CLAIMS_NEWCOMER = 1
+MAX_ACTIVE_CLAIMS_CONTRIBUTOR = 3
+MAX_ACTIVE_CLAIMS_TRUSTED = 10
+MAX_ACTIVE_CLAIMS_EXPERT = 50
+
+
+def _get_tier(reputation: int) -> str:
+    """Get trust tier name for a given reputation score."""
+    for threshold, tier in TIER_THRESHOLDS:
+        if reputation >= threshold:
+            return tier
+    return TIER_NEWCOMER
+
+
+def _max_active_claims(tier: str) -> int:
+    """Max concurrent claimed (running) jobs for a given tier."""
+    return {
+        TIER_NEWCOMER: MAX_ACTIVE_CLAIMS_NEWCOMER,
+        TIER_CONTRIBUTOR: MAX_ACTIVE_CLAIMS_CONTRIBUTOR,
+        TIER_TRUSTED: MAX_ACTIVE_CLAIMS_TRUSTED,
+        TIER_EXPERT: MAX_ACTIVE_CLAIMS_EXPERT,
+    }.get(tier, 1)
 
 
 class Store:
@@ -33,13 +83,16 @@ class Store:
         # Compute configs: user_id -> dict
         self._compute_configs: dict[str, dict] = {}
 
+        # Activity log: list of dicts (most recent first)
+        self._activity: list[dict] = []
+
         # Seed some sample data
         self._seed()
 
     def _seed(self):
         """Seed initial demo data."""
         # Create a system user for seeded jobs
-        sys_id = self.create_user("system", is_system=True)
+        sys_id = self.create_user("system", is_system=True, reputation=9999)
 
         self.create_job(
             posted_by=sys_id,
@@ -106,23 +159,31 @@ class Store:
             params={"n": (2**127) - 1},
         )
 
-        # Create a batch of invite codes
+        # Create a batch of invite codes (still useful for trust bootstrapping)
         for _ in range(5):
             self.create_invite(created_by=sys_id)
 
     # --- Users ---
 
-    def create_user(self, handle: str, is_system: bool = False) -> str:
+    def create_user(self, handle: str, is_system: bool = False,
+                    reputation: int | None = None,
+                    invited_by: str | None = None) -> str:
         user_id = str(uuid.uuid4())
+        if reputation is None:
+            reputation = REP_INVITED if invited_by else REP_INITIAL
         with self._lock:
             self._users[user_id] = {
                 "id": user_id,
                 "handle": handle,
                 "is_system": is_system,
                 "created_at": time.time(),
+                "reputation": reputation,
+                "tier": _get_tier(reputation),
+                "invited_by": invited_by,
                 "jobs_posted": 0,
                 "jobs_claimed": 0,
                 "jobs_solved": 0,
+                "jobs_failed": 0,
             }
             # Default compute config
             self._compute_configs[user_id] = {
@@ -133,6 +194,26 @@ class Store:
                 "max_threads": 4,
             }
         return user_id
+
+    def register_user(self, handle: str) -> tuple[bool, str]:
+        """
+        Open registration — anyone can join without an invite.
+
+        Returns (success, user_id_or_error_message).
+        New users start at REP_INITIAL (newcomer tier).
+        """
+        handle = handle.strip()
+        if not handle or len(handle) > 30:
+            return False, "Handle must be 1-30 characters."
+        if not handle.replace("_", "").replace("-", "").isalnum():
+            return False, "Handle may only contain letters, numbers, _ and -."
+        with self._lock:
+            for u in self._users.values():
+                if u["handle"] == handle:
+                    return False, "That handle is already taken."
+        user_id = self.create_user(handle, reputation=REP_INITIAL)
+        self._log_activity("join", user_id, detail=f"{handle} joined the network")
+        return True, user_id
 
     def get_user(self, user_id: str) -> dict | None:
         with self._lock:
@@ -145,6 +226,26 @@ class Store:
                 if u["handle"] == handle:
                     return dict(u)
         return None
+
+    def add_reputation(self, user_id: str, amount: int, reason: str = ""):
+        """Add (or subtract) reputation and recalculate tier."""
+        with self._lock:
+            user = self._users.get(user_id)
+            if not user:
+                return
+            user["reputation"] = max(0, user["reputation"] + amount)
+            user["tier"] = _get_tier(user["reputation"])
+        if reason:
+            self._log_activity("reputation", user_id,
+                               detail=f"{'+' if amount >= 0 else ''}{amount}: {reason}")
+
+    def get_leaderboard(self, limit: int = 20) -> list[dict]:
+        """Top users by reputation."""
+        with self._lock:
+            users = [dict(u) for u in self._users.values()
+                     if not u["is_system"]]
+        users.sort(key=lambda u: u["reputation"], reverse=True)
+        return users[:limit]
 
     # --- Sessions ---
 
@@ -162,7 +263,7 @@ class Store:
         with self._lock:
             self._sessions.pop(token, None)
 
-    # --- Invites ---
+    # --- Invites (optional trust boost) ---
 
     def create_invite(self, created_by: str) -> str:
         code = secrets.token_urlsafe(8)
@@ -185,7 +286,7 @@ class Store:
 
     def redeem_invite(self, code: str, handle: str) -> tuple[bool, str]:
         """
-        Redeem an invite code and create a new user.
+        Redeem an invite code and create a new user with boosted reputation.
 
         Returns (success, message_or_user_id).
         """
@@ -195,25 +296,27 @@ class Store:
                 return False, "Invalid invite code."
             if invite["redeemed_by"]:
                 return False, "This invite code has already been used."
-
-            # Check handle uniqueness
             for u in self._users.values():
                 if u["handle"] == handle:
                     return False, "That handle is already taken."
 
-        # Create user (releases and reacquires lock internally)
-        user_id = self.create_user(handle)
+        inviter_id = invite["created_by"]
+        user_id = self.create_user(handle, reputation=REP_INVITED,
+                                   invited_by=inviter_id)
 
         with self._lock:
             self._invites[code]["redeemed_by"] = user_id
             self._invites[code]["redeemed_at"] = time.time()
 
+        self._log_activity("invite", user_id,
+                           detail=f"{handle} joined via invite (boosted trust)")
         return True, user_id
 
     # --- Jobs ---
 
     def create_job(self, posted_by: str, title: str, category: str,
-                   description: str, params: dict) -> str:
+                   description: str, params: dict,
+                   bounty: int = 0) -> str:
         job_id = str(uuid.uuid4())
         now = time.time()
         with self._lock:
@@ -232,10 +335,14 @@ class Store:
                 "solved_at": None,
                 "workers": [],            # list of user_ids contributing
                 "compute_backend": None,  # what backend solved it
+                "bounty": bounty,         # reputation bounty for solver
             }
             user = self._users.get(posted_by)
             if user:
                 user["jobs_posted"] += 1
+        if bounty > 0:
+            self._log_activity("bounty", posted_by,
+                               detail=f"Bounty of {bounty} rep on: {title}")
         return job_id
 
     def list_jobs(self, category: str | None = None,
@@ -260,14 +367,33 @@ class Store:
                 return False, "Job not found."
             if job["status"] != "open":
                 return False, f"Job is already {job['status']}."
+
+            user = self._users.get(user_id)
+            if not user:
+                return False, "User not found."
+
+            # Rate limit: check active claims based on tier
+            tier = user.get("tier", TIER_NEWCOMER)
+            max_claims = _max_active_claims(tier)
+            active = sum(
+                1 for j in self._jobs.values()
+                if j["claimed_by"] == user_id and j["status"] in ("claimed", "running")
+            )
+            if active >= max_claims:
+                return False, (
+                    f"You can have at most {max_claims} active job(s) "
+                    f"at your current tier ({tier}). "
+                    f"Complete or release existing jobs first."
+                )
+
             job["status"] = "claimed"
             job["claimed_by"] = user_id
             job["claimed_at"] = time.time()
             if user_id not in job["workers"]:
                 job["workers"].append(user_id)
-            user = self._users.get(user_id)
-            if user:
-                user["jobs_claimed"] += 1
+            user["jobs_claimed"] += 1
+        self._log_activity("claim", user_id,
+                           detail=f"Claimed: {job['title']}")
         return True, "Job claimed."
 
     def update_job_status(self, job_id: str, status: str,
@@ -280,9 +406,26 @@ class Store:
                     job["result"] = result
                 if status == "solved":
                     job["solved_at"] = time.time()
-                    user = self._users.get(job.get("claimed_by", ""))
+                    solver_id = job.get("claimed_by", "")
+                    user = self._users.get(solver_id)
                     if user:
                         user["jobs_solved"] += 1
+                        # Reputation reward
+                        reward = REP_JOB_SOLVED + job.get("bounty", 0)
+                        user["reputation"] += reward
+                        user["tier"] = _get_tier(user["reputation"])
+                        # Check if solver was invited — bonus to inviter
+                        inviter_id = user.get("invited_by")
+                        if inviter_id:
+                            inviter = self._users.get(inviter_id)
+                            if inviter:
+                                inviter["reputation"] += REP_INVITE_BONUS
+                                inviter["tier"] = _get_tier(inviter["reputation"])
+                elif status == "failed":
+                    solver_id = job.get("claimed_by", "")
+                    user = self._users.get(solver_id)
+                    if user:
+                        user["jobs_failed"] += 1
 
     def add_worker(self, job_id: str, user_id: str):
         with self._lock:
@@ -306,6 +449,25 @@ class Store:
                     existing[key] = config[key]
             self._compute_configs[user_id] = existing
 
+    # --- Activity Log ---
+
+    def _log_activity(self, kind: str, user_id: str, detail: str = ""):
+        entry = {
+            "kind": kind,
+            "user_id": user_id,
+            "detail": detail,
+            "timestamp": time.time(),
+        }
+        with self._lock:
+            self._activity.insert(0, entry)
+            # Keep last 200 entries
+            if len(self._activity) > 200:
+                self._activity = self._activity[:200]
+
+    def get_activity(self, limit: int = 30) -> list[dict]:
+        with self._lock:
+            return list(self._activity[:limit])
+
     # --- Stats ---
 
     def get_stats(self) -> dict:
@@ -319,6 +481,10 @@ class Store:
             active_invites = sum(
                 1 for i in self._invites.values() if not i["redeemed_by"]
             )
+            total_bounties = sum(
+                j.get("bounty", 0) for j in self._jobs.values()
+                if j["status"] == "open"
+            )
         return {
             "total_jobs": total_jobs,
             "open_jobs": open_jobs,
@@ -326,4 +492,5 @@ class Store:
             "running_jobs": total_jobs - open_jobs - solved_jobs,
             "total_users": total_users,
             "active_invites": active_invites,
+            "total_bounties": total_bounties,
         }
